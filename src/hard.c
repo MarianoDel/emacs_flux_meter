@@ -28,8 +28,6 @@ extern volatile unsigned short adc_ch [];
 unsigned short s1 = 0;
 unsigned short s2 = 0;
 
-#define sequence_ready         (DMA1->ISR & DMA_ISR_TCIF1)
-#define sequence_ready_reset   (DMA1->IFCR = DMA_ISR_TCIF1)
 
 /* Module Functions ------------------------------------------------------------*/
 

@@ -22,15 +22,17 @@ typedef unsigned char UINT8;
 
 #define PMASK       0x000F    //ver clear data
 
-//#define LCDClearData GPIOA->BSRR = 0x000F0000	//reset PA3..PA0
+// #define LCDClearData GPIOA->BSRR = 0x000F0000	//reset PA3..PA0
 //#define LCDClearData GPIOA->BSRR = 0x0F000000	//reset PA8..PA11
-#define LCDClearData	GPIOC->BRR = PMASK;    //reset PC0 - PC3
+// #define LCDClearData	GPIOC->BRR = PMASK;    //reset PC0 - PC3
+#define LCDClearData	GPIOA->BRR = PMASK;    //reset PA0 - PA3
 
 /***  Declarations of ports of a specified MCU  ***/
 /* Choose the output control pins accord your MCU */
 #define lcd4bit		1		/* 4 bit interface; comment this line if  */
 							/*        is 8 bit interface              */
-#define lcdPort2	GPIOC	/* Port of 4 data bits to lcd connection  */
+#define lcdPort2	GPIOA	/* Port of 4 data bits to lcd connection  */
+// #define lcdPort2	GPIOC	/* Port of 4 data bits to lcd connection  */
 #define lcdDataPinOffset	0	//offset al primer pin de los datos
 					//PA0 = 0; PA4 = 4; PA8 = 8
 //--- End of LCD Configurations ---//

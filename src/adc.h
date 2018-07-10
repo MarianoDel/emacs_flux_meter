@@ -25,14 +25,11 @@
 #endif
 //----------- End of ADC Configurations --------------//
 
-#define I_Channel_1		adc_ch[0]
-#define I_Channel_2	        adc_ch[1]
-#define I_Channel_3	       	adc_ch[2]
-#define I_Channel_4	      	adc_ch[3]
-#define I_Channel_5	      	adc_ch[4]
-#define I_Channel_6	      	adc_ch[5]
-#define Temp_Channel	      	adc_ch[6]
-#define ADC_CHANNEL_QUANTITY         7
+#define X_Channel    adc_ch[0]
+#define Y_Channel    adc_ch[1]
+#define Z_Channel    adc_ch[2]
+
+#define ADC_CHANNEL_QUANTITY         3
 #define ADC_LAST_CHANNEL_QUANTITY    (ADC_CHANNEL_QUANTITY - 1)
 //----------- End of ADC Defines --------------//
 

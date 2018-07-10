@@ -41,21 +41,21 @@
 
 //--- Hardware Welcome Code ------------------//
 #ifdef HARDWARE_VERSION_1_0
-#define HARD "Hardware Version: 1.0\n"
+#define HARD "Hardware V: 1.0"
 #endif
 #ifdef HARDWARE_VERSION_2_0
-#define HARD "Hardware Version: 2.0\n"
+#define HARD "Hardware V: 2.0"
 #endif
 
 //--- Software Welcome Code ------------------//
 #ifdef SOFTWARE_VERSION_1_2
-#define SOFT "Software Version: 1.2\n"
+#define SOFT "Software V: 1.2"
 #endif
 #ifdef SOFTWARE_VERSION_1_1
-#define SOFT "Software Version: 1.1\n"
+#define SOFT "Software V: 1.1"
 #endif
 #ifdef SOFTWARE_VERSION_1_0
-#define SOFT "Software Version: 1.0\n"
+#define SOFT "Software V: 1.0"
 #endif
 
 //-------- Configuration for Outputs-Channels -----
@@ -95,12 +95,12 @@
 //GPIOA pin9    TIM1_CH2
 
 //GPIOA pin10
-#define S1_PIN ((GPIOA->IDR & 0x0400) == 0)
+#define S2_PIN ((GPIOA->IDR & 0x0400) == 0)
 
 //GPIOA pin11    NC
 
 //GPIOA pin12
-#define S2_PIN ((GPIOA->IDR & 0x1000) == 0)
+#define S1_PIN ((GPIOA->IDR & 0x1000) == 0)
 
 //GPIOA pin13
 //GPIOA pin14    

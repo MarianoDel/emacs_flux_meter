@@ -25,7 +25,7 @@
 
 #include <stdio.h>
 #include <string.h>
-
+#include <math.h>
 
 
 
@@ -65,6 +65,14 @@ void DMAConfig(void);
 #define RCC_DMA_CLK_ON 		RCC->AHBENR |= RCC_AHBENR_DMAEN
 #define RCC_DMA_CLK_OFF 	RCC->AHBENR &= ~RCC_AHBENR_DMAEN
 
+#define sequence_ready         (DMA1->ISR & DMA_ISR_TCIF1)
+#define sequence_ready_reset   (DMA1->IFCR = DMA_ISR_TCIF1)
+
+
+
+#define PID_UNDERSAMPLING    5    //muestreo a 24KHz / pid_samples
+
+
 const char s_blank_line [] = {"                "};
 //-------------------------------------------//
 // @brief  Main program.
@@ -73,10 +81,12 @@ const char s_blank_line [] = {"                "};
 //------------------------------------------//
 int main(void)
 {
-    unsigned short i = 0;
+    unsigned char i = 0;
+    unsigned short ii = 0;    
     char s_to_send [100];
     main_state_t main_state = MAIN_INIT;
     resp_t resp = resp_continue;
+    unsigned char undersampling = 0;
     
     //GPIO Configuration.
     GPIO_Config();
@@ -86,11 +96,6 @@ int main(void)
     {
         while (1)	/* Capture error */
         {
-            // if (LED)
-            //     LED_OFF;
-            // else
-            //     LED_ON;
-
             for (i = 0; i < 255; i++)
             {
                 asm (	"nop \n\t"
@@ -100,40 +105,24 @@ int main(void)
         }
     }
 
-
+    //-- Prueba salida PWM ----------
     TIM_1_Init();
-    TIM_3_Init();
-
-    Update_TIM1_CH1(0);
-    Update_TIM1_CH2(0);    
-    Update_TIM3_CH1(0);
-    Update_TIM3_CH2(0);
-    Update_TIM3_CH3(0);
-    Update_TIM3_CH4(0);
-
-    //-- Prueba con ADC INT ----------
-    //-- ADC configuration.
-    // AdcConfig();
-    // ADC1->CR |= ADC_CR_ADSTART;
 
     // while (1)
     // {
-    //     if (!timer_standby)
+    //     for (ii = 0; ii < 1000; ii++)
     //     {
-    //         timer_standby = 1000;
-    //         sprintf(s_to_send, "i1: %d, i2: %d, i3: %d, i4: %d, i5: %d, i6: %d, t: %d\n",
-    //                 I_Channel_1,
-    //                 I_Channel_2,
-    //                 I_Channel_3,
-    //                 I_Channel_4,
-    //                 I_Channel_5,
-    //                 I_Channel_6,
-    //                 Temp_Channel);
-
-    //         Usart2Send(s_to_send);
+    //         Update_TIM1_CH2(ii);
+    //         Wait_ms(5);
+    //     }
+    //     for (ii = 1000; ii > 0; ii--)
+    //     {
+    //         Update_TIM1_CH2(ii);
+    //         Wait_ms(5);
     //     }
     // }
-    //-- Fin Prueba con ADC INT ----------    
+    //-- Fin Prueba salida PWM ----------    
+
 
     //-- Prueba con LCD ----------
     LCDInit();
@@ -146,36 +135,27 @@ int main(void)
     Wait_ms(100);
     Lcd_Command(BLINK_OFF);
     Wait_ms(100);
-    // CTRL_BKL_ON;
 
-    LCDTransmitStr(s_blank_line);
-
-    // LCD_1ER_RENGLON;
-    // LCDTransmitStr("Dexel   ");
-    // LCD_2DO_RENGLON;
-    // LCDTransmitStr("Lighting");
-    while (FuncShowBlink ((const char *) "Kirno 6C", (const char *) "Smrt Drv", 1, BLINK_NO) == resp_continue);
-    while (FuncShowBlink ((const char *) "Dexel   ", (const char *) "Lighting", 1, BLINK_NO) == resp_continue);
-
-
-    // while (1);
+    while (FuncShowBlink ((const char *) " Magnetic Flux  ",
+                          (const char *) " Meter          ", 1, BLINK_NO) == resp_continue);
     //-- Fin Prueba con LCD ----------
 
     //--- Mensaje Bienvenida ---//
     //---- Defines from hard.h -----//
 #ifdef HARD
-    while (FuncShowBlink ((const char *) "Dexel   ", (const char *) "Lighting", 1, BLINK_NO) == resp_continue);
+    // while (FuncShowBlink (HARD, SOFT, 1, BLINK_CROSS) == resp_continue);
 #else
 #error	"No Hardware defined in hard.h file"
 #endif
 
 #ifdef SOFT
-    while (FuncShowBlink ((const char *) "Dexel   ", (const char *) "Lighting", 1, BLINK_NO) == resp_continue);
+    // while (FuncShowBlink ((const char *) "Dexel   ", (const char *) "Lighting", 1, BLINK_NO) == resp_continue);
 #else
 #error	"No Soft Version defined in hard.h file"
 #endif
+    while (FuncShowBlink (HARD, SOFT, 1, BLINK_CROSS) == resp_continue);
 
-
+    // while (1);
     //---- End of Defines from hard.h -----//
 
     //-- Prueba de Switches S1 y S2 ----------
@@ -185,23 +165,27 @@ int main(void)
     //     if ((CheckS1()) && (check_s1 == 0))
     //     {
     //         check_s1 = 1;
-    //         Usart2Send("S1\n");
+    //         while (FuncShowBlink ("S1               ",
+    //                               s_blank_line, 0, BLINK_NO) == resp_continue);
     //     }
     //     else if ((!CheckS1()) && (check_s1))
     //     {
     //         check_s1 = 0;
-    //         Usart2Send("not S1\n");
+    //         while (FuncShowBlink ("not S1           ",
+    //                               s_blank_line, 0, BLINK_NO) == resp_continue);            
     //     }
                             
     //     if ((CheckS2()) && (check_s2 == 0))
     //     {
     //         check_s2 = 1;
-    //         Usart2Send("S2\n");
+    //         while (FuncShowBlink ("S2               ",
+    //                               s_blank_line, 0, BLINK_NO) == resp_continue);            
     //     }
     //     else if ((!CheckS2()) && (check_s2))
     //     {
     //         check_s2 = 0;
-    //         Usart2Send("not S2\n");
+    //         while (FuncShowBlink ("not S2           ",
+    //                               s_blank_line, 0, BLINK_NO) == resp_continue);            
     //     }
 
     //     UpdateSwitches();
@@ -211,184 +195,91 @@ int main(void)
     
     //-- Prueba con ADC & DMA ----------
     //-- ADC configuration.
-// #ifdef ADC_WITH_DMA
-//     AdcConfig();
+#ifdef ADC_WITH_DMA
+    AdcConfig();
 
-//     //-- DMA configuration.
-//     DMAConfig();
-//     DMA1_Channel1->CCR |= DMA_CCR_EN;
+    //-- DMA configuration.
+    DMAConfig();
+    DMA1_Channel1->CCR |= DMA_CCR_EN;
 
-//     ADC1->CR |= ADC_CR_ADSTART;
+    ADC1->CR |= ADC_CR_ADSTART;
     
-//     // Prueba ADC & DMA
-//     while(1)
-//     {
-//         if (DMA1->ISR & DMA_ISR_TCIF1)    //esto es sequence ready
-//         {
-//             // Clear DMA TC flag
-//             DMA1->IFCR = DMA_ISR_TCIF1;
+    // Prueba ADC & DMA
+    while(1)
+    {
+        if (sequence_ready)
+        {
+            // Clear DMA TC flag
+            sequence_ready_reset;
 
-//             if (undersampling < (PID_UNDERSAMPLING - 1))
-//             {
-//                 undersampling++;
-//             }
-//             else
-//             {
-//                 undersampling = 0;
-//                 if (CTRL_FAN)
-//                     CTRL_FAN_OFF;
-//                 else
-//                     CTRL_FAN_ON;
+            if (undersampling < (PID_UNDERSAMPLING - 1))
+            {
+                undersampling++;
+            }
+            else
+            {
+                undersampling = 0;
 
-//                 //PID CH1
-//                 if (!sp1_filtered)
-//                     Update_PWM1(0);
-//                 else
-//                 {
-//                     d_ch1 = PID_roof (sp1_filtered, I_Channel_1, d_ch1, &e_z1_ch1, &e_z2_ch1);
+                //cargo vectores
+                if (index_vector < (VECTOR_LENGTH - 1))
+                {
+                    x = X_Channel - zero_for_x;
+                    y = Y_Channel - zero_for_y;
+                    z = Z_Channel - zero_for_z;
 
-//                     if (d_ch1 < 0)
-//                         d_ch1 = 0;
-//                     else
-//                     {
-//                         if (d_ch1 > DUTY_90_PERCENT)
-//                             d_ch1 = DUTY_90_PERCENT;
-                    
-//                         Update_PWM1(d_ch1);
-//                     }
-//                 }
+                    B_module = x * x;
+                    B_module += y * y;
+                    B_module += z * z;                    
 
-//                 //PID CH2
-//                 if (!sp2_filtered)
-//                     Update_PWM2(0);
-//                 else
-//                 {                
-//                     d_ch2 = PID_roof (sp2_filtered, I_Channel_2, d_ch2, &e_z1_ch2, &e_z2_ch2);
+                    B_module = sqrt(B_module);
 
-//                     if (d_ch2 < 0)
-//                         d_ch2 = 0;
-//                     else
-//                     {
-//                         if (d_ch2 > DUTY_90_PERCENT)
-//                             d_ch2 = DUTY_90_PERCENT;
-                    
-//                         Update_PWM2(d_ch2);
-//                     }
-//                 }
+                    v_B [index_vector] = B_module;
+                    Update_TIM1_CH2 (B_module);
 
-//                 //PID CH3
-//                 if (!sp3_filtered)
-//                     Update_PWM3(0);
-//                 else
-//                 {                                
-//                     d_ch3 = PID_roof (sp3_filtered, I_Channel_3, d_ch3, &e_z1_ch3, &e_z2_ch3);
+                    if (x < 0)
+                        x = -x;
 
-//                     if (d_ch3 < 0)
-//                         d_ch3 = 0;
-//                     else
-//                     {
-//                         if (d_ch3 > DUTY_90_PERCENT)
-//                             d_ch3 = DUTY_90_PERCENT;
-                    
-//                         Update_PWM3(d_ch3);
-//                     }
-//                 }
+                    if (max_x < x)
+                        max_x = x;
 
-//                 //PID CH4
-//                 if (!sp4_filtered)
-//                     Update_PWM4(0);
-//                 else
-//                 {
-//                     d_ch4 = PID_roof (sp4_filtered, I_Channel_4, d_ch4, &e_z1_ch4, &e_z2_ch4);
+                    if (y < 0)
+                        y = -y;
 
-//                     if (d_ch4 < 0)
-//                         d_ch4 = 0;
-//                     else
-//                     {
-//                         if (d_ch4 > DUTY_90_PERCENT)
-//                             d_ch4 = DUTY_90_PERCENT;
-                    
-//                         Update_PWM4(d_ch4);
-//                     }
-//                 }
+                    if (may_y < y)
+                        may_y = y;
 
-//                 //PID CH5
-//                 if (!sp5_filtered)
-//                     Update_PWM5(0);
-//                 else
-//                 {                
-//                     d_ch5 = PID_roof (sp5_filtered, I_Channel_5, d_ch5, &e_z1_ch5, &e_z2_ch5);
+                    if (z < 0)
+                        z = -z;
 
-//                     if (d_ch5 < 0)
-//                         d_ch5 = 0;
-//                     else
-//                     {
-//                         if (d_ch5 > DUTY_90_PERCENT)
-//                             d_ch5 = DUTY_90_PERCENT;
-                    
-//                         Update_PWM5(d_ch5);
-//                     }
-//                 }
+                    if (maz_z < z)
+                        maz_z = z;
+                                        
+                    index_vector++;
+                }
+                else
+                {
+                    index_vector = 0;
+                    main_state = MAIN_CALCULATE_VECTOR;
+                }
 
-//                 //PID CH6
-//                 if (!sp6_filtered)
-//                     Update_PWM6(0);
-//                 else
-//                 {                                
-//                     d_ch6 = PID_roof (sp6_filtered, I_Channel_6, d_ch6, &e_z1_ch6, &e_z2_ch6);
 
-//                     if (d_ch6 < 0)
-//                         d_ch6 = 0;
-//                     else
-//                     {
-//                         if (d_ch6 > DUTY_90_PERCENT)
-//                             d_ch6 = DUTY_90_PERCENT;
-                    
-//                         Update_PWM6(d_ch6);
-//                     }
-//                 }               
-//             }
-//         }
+                
+            }
+        }
 
-//         //me fijo si hubo overrun
-//         if (ADC1->ISR & ADC_IT_OVR)
-//         {
-//             ADC1->ISR |= ADC_IT_EOC | ADC_IT_EOSEQ | ADC_IT_OVR;
-//             Usart2Send("over\n");
-//         }
+        //me fijo si hubo overrun
+        if (ADC1->ISR & ADC_IT_OVR)
+        {
+            ADC1->ISR |= ADC_IT_EOC | ADC_IT_EOSEQ | ADC_IT_OVR;
+        }
 
-//         if (!timer_standby)
-//         {
-//             timer_standby = 1000;
-//             //envio corrientes
-//             sprintf(s_to_send, "i1: %d, i2: %d, i3: %d, i4: %d, i5: %d, i6: %d, t: %d\n",
-//                     I_Channel_1,
-//                     I_Channel_2,
-//                     I_Channel_3,
-//                     I_Channel_4,
-//                     I_Channel_5,
-//                     I_Channel_6,
-//                     Temp_Channel);
-
-//             Usart2Send(s_to_send);
-
-//             //envio canales dmx
-//             sprintf(s_to_send, "c0: %d, c1: %d, c2: %d, c3: %d, c4: %d, c5: %d, c6: %d\n",
-//                     data7[0],
-//                     data7[1],
-//                     data7[2],
-//                     data7[3],
-//                     data7[4],
-//                     data7[5],
-//                     data7[6]);
-
-//             Usart2Send(s_to_send);
+        if (!timer_standby)
+        {
+            timer_standby = 1000;
             
-//         }
-
-        
-//     }
-// #endif
+        }        
+    }
+#endif
     //-- Prueba con ADC & DMA ----------
 
     

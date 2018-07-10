@@ -16,7 +16,8 @@
 //checkS2()
 
 //-- Config Defines for the LCD used ----------
-#define LINE_LENGTH    8
+#define LINE_LENGTH    16
+// #define LINE_LENGTH    8
 #define USE_SCROLL_SECOND_LINE
 #define USE_SCROLL_FIRST_LINE
 

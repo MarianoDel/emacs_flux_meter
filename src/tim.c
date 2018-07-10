@@ -105,22 +105,22 @@ void TIM_1_Init (void)
     TIM1->CR2 |= TIM_CR2_MMS_1;		//UEV -> TRG0
 
     TIM1->SMCR = 0x0000;
-    TIM1->CCMR1 = 0x6060;			//CH2 y CH1 output PWM mode 1
+    TIM1->CCMR1 = 0x6000;    //CH2 output PWM mode 1
     TIM1->CCMR2 = 0x0000;
 
-    TIM1->CCER |= TIM_CCER_CC2E | TIM_CCER_CC2P | TIM_CCER_CC1E | TIM_CCER_CC1P;	//CH2 y CH1 enable on pin
+    TIM1->CCER |= TIM_CCER_CC2E;    //CH2 enable on pin
 
     TIM1->BDTR |= TIM_BDTR_MOE;
     
     TIM1->ARR = DUTY_100_PERCENT;
     TIM1->CNT = 0;
-    TIM1->PSC = 0;		
+    TIM1->PSC = 1;    //48M / 1000 = 48KHz / 2 = 24KHz
 
     //Configuracion Pines
     //Alternate Fuction
     temp = GPIOA->AFR[1];
-    temp &= 0xFFFFFF00;    
-    temp |= 0x00000022;			//PA9 -> AF2; PA8 -> AF2
+    temp &= 0xFFFFFF0F;    
+    temp |= 0x00000020;			//PA9 -> AF2;
     GPIOA->AFR[1] = temp;
 
     // Enable timer ver UDIS
