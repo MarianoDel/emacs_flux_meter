@@ -154,6 +154,25 @@ unsigned short MAFilter32 (unsigned short new_sample, unsigned short * vsample)
 	return total_ma >> 5;
 }
 
+unsigned short MAFilter32Fast (unsigned short * vsample)
+{
+	unsigned int total_ma;
+
+	total_ma = *(vsample) + *(vsample + 1) + *(vsample + 2) + *(vsample + 3) +
+            *(vsample + 4) + *(vsample + 5) + *(vsample + 6) + *(vsample + 7);
+        
+	total_ma += *(vsample + 8) + *(vsample + 9) + *(vsample + 10) + *(vsample + 11) +
+            *(vsample + 12) + *(vsample + 13) + *(vsample + 14) + *(vsample + 15);
+        
+	total_ma += *(vsample + 16) + *(vsample + 17) + *(vsample + 18) + *(vsample + 19) +
+            *(vsample + 20) + *(vsample + 21) + *(vsample + 22) + *(vsample + 23);
+        
+	total_ma += *(vsample + 24) + *(vsample + 25) + *(vsample + 26) + *(vsample + 27) +
+            *(vsample + 28) + *(vsample + 29) + *(vsample + 30) + *(vsample + 31);
+
+	return (unsigned short) (total_ma >> 5);
+}
+
 //Filtro circular, recibe
 //new_sample, p_vec_samples: vector donde se guardan todas las muestras
 //p_vector: puntero que recorre el vector de muestras, p_sum: puntero al valor de la sumatoria de muestras

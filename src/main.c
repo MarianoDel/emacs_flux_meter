@@ -50,9 +50,24 @@ volatile unsigned char switches_timer = 0;
 // ------- de los timers -------
 volatile unsigned short timer_standby;
 volatile unsigned short wait_ms_var = 0;
-volatile unsigned char temp_sample_timer = 0;
-volatile unsigned short need_to_save_timer = 0;
 
+unsigned short max_x = 0;
+unsigned short min_x = 0;
+unsigned short max_y = 0;
+unsigned short min_y = 0;
+unsigned short max_z = 0;
+unsigned short min_z = 0;
+
+unsigned short zero_for_x = 0;
+unsigned short zero_for_y = 0;
+unsigned short zero_for_z = 0;
+
+unsigned short x_zero [32];
+unsigned short y_zero [32];
+unsigned short z_zero [32];
+
+#define VECTOR_LENGTH 100
+unsigned short v_B [VECTOR_LENGTH];
 
 //--- FUNCIONES DEL MODULO ---//
 extern void EXTI4_15_IRQHandler(void);
@@ -83,10 +98,19 @@ int main(void)
 {
     unsigned char i = 0;
     unsigned short ii = 0;    
-    char s_to_send [100];
-    main_state_t main_state = MAIN_INIT;
+    char s_lcd1 [20];
+    char s_lcd2 [20];
+    main_state_t main_state = MAIN_SET_ZERO_0;
     resp_t resp = resp_continue;
     unsigned char undersampling = 0;
+    unsigned char zero_index = 0;
+    unsigned char index_vector = 0;
+    short x = 0, y = 0, z = 0;
+    unsigned int B_module = 0;
+    unsigned short max_b = 0;
+    unsigned char vector_ended = 0;
+
+    unsigned char screen = SCREEN_MODULE_B;
     
     //GPIO Configuration.
     GPIO_Config();
@@ -207,308 +231,181 @@ int main(void)
     // Prueba ADC & DMA
     while(1)
     {
-        if (sequence_ready)
+        switch (main_state)
         {
-            // Clear DMA TC flag
-            sequence_ready_reset;
-
-            if (undersampling < (PID_UNDERSAMPLING - 1))
+        case MAIN_SET_ZERO_0:
+            undersampling = 0;
+            zero_index = 0;
+            main_state = MAIN_SET_ZERO_1;
+            break;
+            
+        case MAIN_SET_ZERO_1:
+            if (sequence_ready)
             {
-                undersampling++;
-            }
-            else
-            {
-                undersampling = 0;
+                // Clear DMA TC flag
+                sequence_ready_reset;
 
-                //cargo vectores
-                if (index_vector < (VECTOR_LENGTH - 1))
+                //tomo 32 muestras para setear el zero
+                if (undersampling < (PID_UNDERSAMPLING - 1))
                 {
-                    x = X_Channel - zero_for_x;
-                    y = Y_Channel - zero_for_y;
-                    z = Z_Channel - zero_for_z;
-
-                    B_module = x * x;
-                    B_module += y * y;
-                    B_module += z * z;                    
-
-                    B_module = sqrt(B_module);
-
-                    v_B [index_vector] = B_module;
-                    Update_TIM1_CH2 (B_module);
-
-                    if (x < 0)
-                        x = -x;
-
-                    if (max_x < x)
-                        max_x = x;
-
-                    if (y < 0)
-                        y = -y;
-
-                    if (may_y < y)
-                        may_y = y;
-
-                    if (z < 0)
-                        z = -z;
-
-                    if (maz_z < z)
-                        maz_z = z;
-                                        
-                    index_vector++;
+                    undersampling++;
                 }
                 else
                 {
-                    index_vector = 0;
-                    main_state = MAIN_CALCULATE_VECTOR;
+                    undersampling = 0;
+                    if (zero_index < 32)
+                    {
+                        x_zero[zero_index] = X_Channel;
+                        y_zero[zero_index] = Y_Channel;
+                        z_zero[zero_index] = Z_Channel;
+                        zero_index++;
+                    }
                 }
+            }
 
+            resp = FuncShowBlink ((const char *) " Setting Zero   ",
+                                  (const char *) " Flux           ", 3, BLINK_DIRECT);
 
-                
+            if ((resp == resp_finish) && (zero_index == 32))
+            {
+                main_state = MAIN_SET_ZERO_2;
+                zero_for_x = MAFilter32Fast(x_zero);
+                zero_for_y = MAFilter32Fast(y_zero);
+                zero_for_z = MAFilter32Fast(z_zero);
+                sprintf(s_lcd1, "x0: %d y0: %d ", zero_for_x, zero_for_y);
+                sprintf(s_lcd2, "z0: %d        ", zero_for_z);
+            }
+            break;
+
+        case MAIN_SET_ZERO_2:
+            resp = FuncShowBlink (s_lcd1, s_lcd2, 1, BLINK_NO);
+
+            if (resp == resp_finish)
+                main_state = MAIN_TAKE_SAMPLES;
+            
+            break;
+
+        case MAIN_TAKE_SAMPLES:
+            if (vector_ended)
+            {
+                vector_ended = 0;
+                main_state++;
+            }
+            break;
+
+        case MAIN_CALCULATE_FREQUENCY:
+            //busco dos puntos iguales en el vector con un threshold
+            max_b = 0;
+            for (ii = 0; ii < VECTOR_LENGTH; ii++)
+            {
+                if (max_b < v_B[index_vector])
+                    max_b = v_B[index_vector];
+            }
+
+            
+            sprintf(s_lcd2, "|B|= %d       ", max_b);
+            main_state++;
+            
+            break;
+
+        case MAIN_SHOW_SCREENS:
+            // if (screen == SCREEN_MODULE_B)
+            //     main_state = MAIN_SHOW_MODULE_B;
+
+            // if (screen == SCREEN_COMPONENTS_XYZ)
+            //     main_state = MAIN_SHOW_COMPONENTS_XYZ;            
+
+            resp = FuncShowBlink (s_blank_line, s_lcd2, 0, BLINK_NO);
+
+            if (resp == resp_finish)
+                main_state = MAIN_TAKE_SAMPLES;
+            break;
+
+        case MAIN_SHOW_MODULE_B:
+            break;
+
+        case MAIN_SHOW_COMPONENTS_XYZ:
+            break;
+
+        default:
+            main_state = MAIN_SET_ZERO_0;
+            break;
+        }
+
+        //siempre tengo muestras y vector cargandose
+        //excepto cuando busco el zero
+        if (main_state > MAIN_SET_ZERO_2)
+        {
+            if (sequence_ready)
+            {
+                // Clear DMA TC flag
+                sequence_ready_reset;
+
+                if (undersampling < (PID_UNDERSAMPLING - 1))
+                    undersampling++;
+                else
+                    undersampling = 0;
+
+                //me fijo si hubo overrun en ADC
+                if (ADC1->ISR & ADC_IT_OVR)
+                {
+                    ADC1->ISR |= ADC_IT_EOC | ADC_IT_EOSEQ | ADC_IT_OVR;
+                }
             }
         }
 
-        //me fijo si hubo overrun
-        if (ADC1->ISR & ADC_IT_OVR)
+        if (!undersampling)
         {
-            ADC1->ISR |= ADC_IT_EOC | ADC_IT_EOSEQ | ADC_IT_OVR;
+            x = X_Channel - zero_for_x;
+            y = Y_Channel - zero_for_y;
+            z = Z_Channel - zero_for_z;
+
+            B_module = x * x;
+            B_module += y * y;
+            B_module += z * z;
+
+            B_module = sqrt(B_module);
+
+            Update_TIM1_CH2 ((unsigned short) B_module);
+
+            if (max_x < x)
+                max_x = x;
+            else if (min_x > x)
+                min_x = x;
+
+            if (max_y < y)
+                max_y = y;
+            else if (min_y > y)
+                min_y = y;
+
+            if (max_z < z)
+                max_z = z;
+            else if (min_z > z)
+                min_z = z;                                        
+
+            if (index_vector < (VECTOR_LENGTH - 1))
+            {
+                v_B [index_vector] = (unsigned short) B_module;
+                index_vector++;
+            }
+            else
+            {
+                index_vector = 0;
+                max_x = 0;
+                max_y = 0;
+                max_z = 0;
+                min_x = 0;
+                min_y = 0;
+                min_z = 0;                
+                vector_ended = 1;
+            }            
         }
 
-        if (!timer_standby)
-        {
-            timer_standby = 1000;
-            
-        }        
-    }
+        //cosas que no tienen que ver cn las muestras
+        UpdateSwitches();
+        
+    }    //fin while 1
 #endif
-    //-- Prueba con ADC & DMA ----------
-
-    
-    // //inicializo el hard que falta
-    // AdcConfig();
-
-    // //-- DMA configuration.
-    // DMAConfig();
-    // DMA1_Channel1->CCR |= DMA_CCR_EN;
-
-    // ADC1->CR |= ADC_CR_ADSTART;
-
-
-    // while (1)
-    // {
-    //     switch (main_state)
-    //     {
-    //     case MAIN_INIT:
-    //         memcpy(&mem_conf, pmem, sizeof(parameters_typedef));
-
-    //         main_state++;
-    //         break;
-
-    //     case MAIN_HARDWARE_INIT:
-
-    //         //reseteo hardware
-    //         //DMX en RX
-    //         SW_RX_TX_RE_NEG;
-    //         DMX_Disa();
-
-    //         //reseteo canales
-    //         Update_TIM1_CH1(0);
-    //         Update_TIM1_CH2(0);    
-    //         Update_TIM3_CH1(0);
-    //         Update_TIM3_CH2(0);
-    //         Update_TIM3_CH3(0);
-    //         Update_TIM3_CH4(0);
-                        
-    //         //reseteo menues
-    //         MasterModeMenuReset();
-    //         FuncSlaveModeReset();
-
-    //         sprintf(s_to_send, "prog type: %d\n", mem_conf.program_type);
-    //         Usart2Send(s_to_send);
-    //         Wait_ms(100);
-    //         sprintf(s_to_send, "Max pwm channels: %d %d %d %d %d %d\n",
-    //                 mem_conf.max_pwm_ch1,
-    //                 mem_conf.max_pwm_ch2,
-    //                 mem_conf.max_pwm_ch3,
-    //                 mem_conf.max_pwm_ch4,
-    //                 mem_conf.max_pwm_ch5,
-    //                 mem_conf.max_pwm_ch6);
-            
-    //         Usart2Send(s_to_send);
-    //         Wait_ms(100);
-            
-    //         main_state++;            
-    //         break;
-
-    //     case MAIN_GET_CONF:
-    //         if (mem_conf.program_type == MASTER_MODE)
-    //         {
-    //             //habilito transmisiones
-    //             SW_RX_TX_DE;
-    //             DMX_Ena();                    
-    //             main_state = MAIN_IN_MASTER_MODE;             
-    //         }                
-
-    //         if (mem_conf.program_type == SLAVE_MODE)
-    //         {
-    //             //variables de recepcion
-    //             Packet_Detected_Flag = 0;
-    //             DMX_channel_selected = mem_conf.dmx_channel;
-    //             DMX_channel_quantity = mem_conf.dmx_channel_quantity;
-
-    //             //habilito recepcion
-    //             SW_RX_TX_RE_NEG;
-    //             DMX_Ena();    
-    //             main_state = MAIN_IN_SLAVE_MODE;
-    //         }
-
-    //         if (mem_conf.program_type == PROGRAMS_MODE)
-    //         {
-    //             //me aseguro no cargar la linea
-    //             SW_RX_TX_RE_NEG;
-    //             main_state = MAIN_IN_PROGRAMS_MODE;
-    //         }
-
-    //         //default state no debiera estar nunca aca!
-    //         if (main_state == MAIN_GET_CONF)
-    //         {
-    //             mem_conf.program_type = SLAVE_MODE;
-    //             main_state = MAIN_IN_SLAVE_MODE;
-    //         }                
-    //         break;
-
-    //     case MAIN_IN_MASTER_MODE:    //por ahora programs mode
-    //         Func_PX(mem_conf.last_program_in_flash, mem_conf.last_program_deep_in_flash);
-    //         UpdateSamplesAndPID();
-    //         if (CheckS2() > S_HALF)
-    //             main_state = MAIN_ENTERING_MAIN_MENU;
-
-    //         MasterModeMenu();
-    //         if (!timer_standby)
-    //         {
-    //             timer_standby = 40;
-    //             SendDMXPacket (PCKT_INIT);
-    //         }
-    //         break;
-            
-    //     case MAIN_IN_SLAVE_MODE:
-    //         FuncSlaveMode();
-    //         if (!timer_standby)
-    //         {
-    //             timer_standby = 1000;
-    //             //envio corrientes
-    //             sprintf(s_to_send, "i1: %d, i2: %d, i3: %d, i4: %d, i5: %d, i6: %d, t: %d\n",
-    //                     I_Channel_1,
-    //                     I_Channel_2,
-    //                     I_Channel_3,
-    //                     I_Channel_4,
-    //                     I_Channel_5,
-    //                     I_Channel_6,
-    //                     Temp_Channel);
-
-    //             Usart2Send(s_to_send);
-
-    //             //envio canales dmx
-    //             sprintf(s_to_send, "c0: %d, c1: %d, c2: %d, c3: %d, c4: %d, c5: %d, c6: %d\n",
-    //                     data7[0],
-    //                     data7[1],
-    //                     data7[2],
-    //                     data7[3],
-    //                     data7[4],
-    //                     data7[5],
-    //                     data7[6]);
-                
-    //             Usart2Send(s_to_send);            
-    //         }
-
-    //         if (CheckS2() > S_HALF)
-    //             main_state = MAIN_ENTERING_MAIN_MENU;
-
-    //         break;
-
-    //     case MAIN_IN_PROGRAMS_MODE:
-    //         Func_PX(mem_conf.last_program_in_flash, mem_conf.last_program_deep_in_flash);
-    //         UpdateSamplesAndPID();
-
-    //         if (CheckS2() > S_HALF)
-    //             main_state = MAIN_ENTERING_MAIN_MENU;
-
-    //         ProgramsModeMenu();
-            
-    //         break;
-
-    //     case MAIN_IN_OVERTEMP:
-    //         CTRL_FAN_ON;
-    //         Update_PWM1(0);
-    //         Update_PWM2(0);
-    //         Update_PWM3(0);
-    //         Update_PWM4(0);
-    //         Update_PWM5(0);
-    //         Update_PWM6(0);
-
-    //         LCD_1ER_RENGLON;
-    //         LCDTransmitStr("OVERTEMP");
-    //         LCD_2DO_RENGLON;
-    //         LCDTransmitStr(s_blank_line);
-
-    //         sprintf(s_to_send, "overtemp: %d\n", Temp_Channel);
-    //         Usart2Send(s_to_send);
-
-    //         main_state = MAIN_IN_OVERTEMP_B;
-    //         break;
-
-    //     case MAIN_IN_OVERTEMP_B:
-    //         if (Temp_Channel < TEMP_IN_50)
-    //         {
-    //             //reconecto
-    //             main_state = MAIN_HARDWARE_INIT;
-    //         }
-            
-    //         break;
-            
-    //     case MAIN_ENTERING_MAIN_MENU:
-    //         //deshabilitar salidas hardware
-    //         SW_RX_TX_RE_NEG;
-    //         DMX_Disa();
-
-    //         //reseteo canales
-    //         Update_TIM1_CH1(0);
-    //         Update_TIM1_CH2(0);    
-    //         Update_TIM3_CH1(0);
-    //         Update_TIM3_CH2(0);
-    //         Update_TIM3_CH3(0);
-    //         Update_TIM3_CH4(0);
-
-    //         MainMenuReset();
-    //         main_state++;
-
-    //         break;
-
-    //     case MAIN_IN_MAIN_MENU:
-    //         resp = MainMenu();
-
-    //         if (resp == resp_need_to_save)
-    //         {
-    //             need_to_save = 1;
-    //             need_to_save_timer = 10000;
-    //             main_state = MAIN_HARDWARE_INIT;
-    //         }
-            
-    //         if (resp == resp_finish)
-    //             main_state = MAIN_HARDWARE_INIT;
-
-    //         break;
-            
-    //     default:
-    //         main_state = MAIN_INIT;
-    //         break;
-    //     }
-
-    //     //cuestiones generales
-        
-    //     UpdateSwitches();
-        
-    // }    //end of while 1
-    
     return 0;
 }
 //--- End of Main ---//

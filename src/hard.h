@@ -138,16 +138,15 @@ typedef enum
 //ESTADOS DEL MAIN
 typedef enum
 {    
-    MAIN_INIT = 0,
-    MAIN_HARDWARE_INIT,
-    MAIN_GET_CONF,
-    MAIN_IN_MASTER_MODE,
-    MAIN_IN_SLAVE_MODE,
-    MAIN_IN_PROGRAMS_MODE,
-    MAIN_IN_OVERTEMP,
-    MAIN_IN_OVERTEMP_B,
-    MAIN_ENTERING_MAIN_MENU,
-    MAIN_IN_MAIN_MENU
+    MAIN_SET_ZERO_0 = 0,
+    MAIN_SET_ZERO_1,
+    MAIN_SET_ZERO_2,
+    MAIN_TAKE_SAMPLES,
+    MAIN_CALCULATE_FREQUENCY,
+    MAIN_SHOW_SCREENS,
+    MAIN_SHOW_MODULE_B,
+    MAIN_SHOW_COMPONENTS_XYZ
+
     
 } main_state_t;
 
@@ -164,6 +163,9 @@ typedef enum {
 
 } resp_t;
 
+//pantallas de medicion
+#define SCREEN_MODULE_B        0
+#define SCREEN_COMPONENTS_XYZ  1
 
 /* Module Functions ------------------------------------------------------------*/
 sw_state_t CheckS1 (void);

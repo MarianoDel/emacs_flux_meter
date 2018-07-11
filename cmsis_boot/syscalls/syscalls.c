@@ -3,6 +3,7 @@
  * @brief    Implementation of newlib syscall
  ********************************************************************************/
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdarg.h>
 #include <sys/types.h>
