@@ -89,7 +89,7 @@ void DMAConfig(void);
 void DMAEnableInterrupt (void);
 void DMADisableInterrupt (void);
 extern void DMA1_Channel1_IRQHandler (void);
-
+short moduleShort (short);
 
 
 // ------- para el DMA -------
@@ -113,6 +113,7 @@ int main(void)
     unsigned char i = 0;
     char s_lcd1 [20];
     char s_lcd2 [20];
+    char s_lcd3 [6];    
     main_state_t main_state = MAIN_SET_ZERO_0;
     resp_t resp = resp_continue;
     freq_t freq_state = FREQ_LOOK_FOR_FIRST_LOW;
@@ -125,7 +126,7 @@ int main(void)
 
     unsigned short start_freq_sample = 0;
     unsigned short end_freq_sample = 0;
-    
+
     
     //GPIO Configuration.
     GPIO_Config();
@@ -382,13 +383,68 @@ int main(void)
             break;
 
         case MAIN_SHOW_MODULE_B:
+            //reviso componentes
+            if (max_x < moduleShort(min_x))
+                max_x = min_x;
+
+            if (max_y < moduleShort(min_y))
+                max_y = min_y;
+            
+            if (max_z < moduleShort(min_z))
+                max_z = min_z;
+
+            if (moduleShort(max_x) > moduleShort(max_y))
+            {
+                if (moduleShort(max_x) > moduleShort(max_z))
+                {
+                    if (max_x < 0)    //el mayor es x
+                        strcpy(s_lcd3, "-x");
+                    else
+                        strcpy(s_lcd3, "x");
+                }
+                else
+                {                    
+                    if (max_z < 0)    //el mayor es z
+                        strcpy(s_lcd3, "-z");
+                    else
+                        strcpy(s_lcd3, "z");
+                }
+            }
+            else
+            {
+                if (moduleShort(max_y) > moduleShort(max_z))
+                {
+                    if (max_y < 0)    //el mayor es y
+                        strcpy(s_lcd3, "-y");
+                    else
+                        strcpy(s_lcd3, "y");
+                }
+                else
+                {                    
+                    if (max_z < 0)    //el mayor es z
+                        strcpy(s_lcd3, "-z");
+                    else
+                        strcpy(s_lcd3, "z");
+                }
+            }                
+                                    
             v_B[0] = max_b;
-            sprintf(s_lcd1, "|Bmean|= %d       ", MAFilter8(v_B));
-            sprintf(s_lcd2, "|Bpeak|= %d       ", max_b);
+            sprintf(s_lcd1, "|Bpeak|=%4d %s ", max_b, s_lcd3);
+            sprintf(s_lcd2, "|Bmean|=%4d    ", MAFilter8(v_B));            
             main_state = MAIN_SHOW_LINES;
             break;
 
         case MAIN_SHOW_COMPONENTS_XYZ:
+            //reviso componentes
+            if (max_x < moduleShort(min_x))
+                max_x = min_x;
+
+            if (max_y < moduleShort(min_y))
+                max_y = min_y;
+            
+            if (max_z < moduleShort(min_z))
+                max_z = min_z;
+            
             sprintf(s_lcd1, "x: %d y: %d   ", max_x, max_y);
             sprintf(s_lcd2, "z: %d         ", max_z);
             main_state = MAIN_SHOW_LINES;
@@ -404,7 +460,7 @@ int main(void)
             }
             else
             {
-                strcpy(s_lcd1, "No freq         ");
+                strcpy(s_lcd1, "No frequency    ");
                 strcpy(s_lcd2, "or low flux     ");
             }
             
@@ -439,13 +495,6 @@ int main(void)
         else
             screen_changed = 0;
         
-            
-                
-
-                
-
-            
-        
         UpdateSwitches();
         
     }    //fin while 1
@@ -453,6 +502,13 @@ int main(void)
     return 0;
 }
 //--- End of Main ---//
+short moduleShort (short a)
+{
+    if (a < 0)
+        return -a;
+    else
+        return a;
+}
 
 void DMA1_Channel1_IRQHandler (void)
 {
