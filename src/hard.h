@@ -166,7 +166,8 @@ typedef enum {
 } resp_t;
 
 typedef enum {
-    FREQ_LOOK_FOR_RISING = 0,
+    FREQ_LOOK_FOR_FIRST_LOW = 0,
+    FREQ_LOOK_FOR_RISING,    
     FREQ_WAIT_LOW,
     FREQ_END_RISING,
     FREQ_ENDED

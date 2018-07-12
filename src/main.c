@@ -115,7 +115,7 @@ int main(void)
     char s_lcd2 [20];
     main_state_t main_state = MAIN_SET_ZERO_0;
     resp_t resp = resp_continue;
-    freq_t freq_state = FREQ_LOOK_FOR_RISING;
+    freq_t freq_state = FREQ_LOOK_FOR_FIRST_LOW;
 
     unsigned char zero_index = 0;
     unsigned short max_b = 0;
@@ -303,6 +303,9 @@ int main(void)
 
             max_b = 0;
             samples_index = 0;
+            freq_state = FREQ_LOOK_FOR_FIRST_LOW;
+            start_freq_sample = 0;
+            end_freq_sample = 0;
             main_state++;
             break;
 
@@ -333,6 +336,12 @@ int main(void)
 
                     switch (freq_state)
                     {
+                    case FREQ_LOOK_FOR_FIRST_LOW:
+                        if (B_module < B_THRESHOLD_FOR_FREQ_DWN)
+                            freq_state++;                            
+                        
+                        break;
+
                     case FREQ_LOOK_FOR_RISING:
                         if (B_module > B_THRESHOLD_FOR_FREQ_UP)
                         {
@@ -340,7 +349,7 @@ int main(void)
                             freq_state++;                            
                         }
                         break;
-
+                        
                     case FREQ_WAIT_LOW:
                         if (B_module < B_THRESHOLD_FOR_FREQ_DWN)
                             freq_state++;                            
@@ -386,8 +395,19 @@ int main(void)
             break;
 
         case MAIN_SHOW_FREQUENCY:
-            sprintf(s_lcd1, "freq: %d      ", max_x);
-            sprintf(s_lcd2, "z: %d         ", max_z);
+            if (end_freq_sample > start_freq_sample)
+            {
+                unsigned short f = end_freq_sample - start_freq_sample;
+                f = 1000 / f;
+                sprintf(s_lcd1, "freq: %d      ", f);
+                strcpy(s_lcd2, s_blank_line);
+            }
+            else
+            {
+                strcpy(s_lcd1, "No freq         ");
+                strcpy(s_lcd2, "or low flux     ");
+            }
+            
             main_state = MAIN_SHOW_LINES;
             break;
             
