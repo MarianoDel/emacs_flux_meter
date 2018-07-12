@@ -123,6 +123,7 @@ int main(void)
 
     unsigned char screen = MAIN_SHOW_MODULE_B;
     unsigned char screen_changed = 0;
+    unsigned char setting_zero = 0;
 
     unsigned short start_freq_sample = 0;
     unsigned short end_freq_sample = 0;
@@ -429,7 +430,7 @@ int main(void)
             }                
                                     
             v_B[0] = max_b;
-            sprintf(s_lcd1, "|Bpeak|=%4d %s ", max_b, s_lcd3);
+            sprintf(s_lcd1, "|Bpeak|=%4d  %s ", max_b, s_lcd3);
             sprintf(s_lcd2, "|Bmean|=%4d    ", MAFilter8(v_B));            
             main_state = MAIN_SHOW_LINES;
             break;
@@ -494,6 +495,19 @@ int main(void)
         }
         else
             screen_changed = 0;
+
+        if (CheckS1() > S_NO)
+        {
+            if (!setting_zero)
+            {
+                setting_zero = 1;
+                DMADisableInterrupt();
+                sequence_ready_reset;
+                main_state = MAIN_SET_ZERO_0;
+            }
+        }
+        else
+            setting_zero = 0;
         
         UpdateSwitches();
         
