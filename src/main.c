@@ -20,7 +20,6 @@
 
 #include "dsp.h"
 #include "lcd.h"
-#include "menues.h"
 #include "lcd_utils.h"
 
 #include <stdio.h>
@@ -130,6 +129,7 @@ int main(void)
     }
 
     //-- Prueba salida PWM ----------
+    TIM_3_Init();
     TIM_1_Init();
 
     // while (1)
@@ -246,13 +246,13 @@ int main(void)
                 sequence_ready_reset;
 
                 //tomo 32 muestras para setear el zero
-                if (undersampling < (PID_UNDERSAMPLING - 1))
-                {
-                    undersampling++;
-                }
-                else
-                {
-                    undersampling = 0;
+                // if (undersampling < (PID_UNDERSAMPLING - 1))
+                // {
+                //     undersampling++;
+                // }
+                // else
+                // {
+                //     undersampling = 0;
                     if (zero_index < 32)
                     {
                         x_zero[zero_index] = X_Channel;
@@ -260,7 +260,7 @@ int main(void)
                         z_zero[zero_index] = Z_Channel;
                         zero_index++;
                     }
-                }
+                // }
             }
 
             resp = FuncShowBlink ((const char *) " Setting Zero   ",
@@ -341,10 +341,58 @@ int main(void)
                 // Clear DMA TC flag
                 sequence_ready_reset;
 
-                if (undersampling < (PID_UNDERSAMPLING - 1))
-                    undersampling++;
+                // if (undersampling < (PID_UNDERSAMPLING - 1))
+                //     undersampling++;
+                // else
+                //     undersampling = 0;
+                //                 if (!undersampling)
+                // {
+                x = X_Channel - zero_for_x;
+                y = Y_Channel - zero_for_y;
+                z = Z_Channel - zero_for_z;
+
+                B_module = x * x;
+                B_module += y * y;
+                B_module += z * z;
+
+                B_module = sqrt(B_module);
+
+                Update_TIM1_CH2 ((unsigned short) B_module);
+
+                if (max_x < x)
+                    max_x = x;
+                else if (min_x > x)
+                    min_x = x;
+
+                if (max_y < y)
+                    max_y = y;
+                else if (min_y > y)
+                    min_y = y;
+
+                if (max_z < z)
+                    max_z = z;
+                else if (min_z > z)
+                    min_z = z;                                        
+
+                //TODO: esto por tiempo agrega un poco de error de amplitud
+                if (index_vector < (VECTOR_LENGTH - 1))
+                {
+                    v_B [index_vector] = (unsigned short) B_module;
+                    index_vector++;
+                }
                 else
-                    undersampling = 0;
+                {
+                    index_vector = 0;
+                    max_x = 0;
+                    max_y = 0;
+                    max_z = 0;
+                    min_x = 0;
+                    min_y = 0;
+                    min_z = 0;                
+                    // vector_ended = 1;
+                }            
+                // }
+
 
                 //me fijo si hubo overrun en ADC
                 if (ADC1->ISR & ADC_IT_OVR)
@@ -354,52 +402,6 @@ int main(void)
             }
         }
 
-        if (!undersampling)
-        {
-            x = X_Channel - zero_for_x;
-            y = Y_Channel - zero_for_y;
-            z = Z_Channel - zero_for_z;
-
-            B_module = x * x;
-            B_module += y * y;
-            B_module += z * z;
-
-            B_module = sqrt(B_module);
-
-            Update_TIM1_CH2 ((unsigned short) B_module);
-
-            if (max_x < x)
-                max_x = x;
-            else if (min_x > x)
-                min_x = x;
-
-            if (max_y < y)
-                max_y = y;
-            else if (min_y > y)
-                min_y = y;
-
-            if (max_z < z)
-                max_z = z;
-            else if (min_z > z)
-                min_z = z;                                        
-
-            if (index_vector < (VECTOR_LENGTH - 1))
-            {
-                v_B [index_vector] = (unsigned short) B_module;
-                index_vector++;
-            }
-            else
-            {
-                index_vector = 0;
-                max_x = 0;
-                max_y = 0;
-                max_z = 0;
-                min_x = 0;
-                min_y = 0;
-                min_z = 0;                
-                vector_ended = 1;
-            }            
-        }
 
         //cosas que no tienen que ver cn las muestras
         UpdateSwitches();

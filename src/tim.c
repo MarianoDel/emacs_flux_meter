@@ -137,19 +137,31 @@ void TIM_3_Init (void)
 
     //Configuracion del timer.
     TIM3->CR1 = 0x00;		//clk int / 1; upcounting
-    TIM3->CR2 = 0x00;		//igual al reset
+    TIM3->CR2 |= TIM_CR2_MMS_1;		//UEV -> TRG0 para signal ADC
 
-    TIM3->SMCR |= TIM_SMCR_SMS_2;			//trigger: reset mode; link timer 1
-    // TIM3->SMCR |= TIM_SMCR_SMS_2 | TIM_SMCR_SMS_1;	//trigger: trigger mode; link timer 1
-    TIM3->CCMR1 = 0x6060;      //CH1, CH2 output PWM mode 1 (channel active TIM3->CNT < TIM3->CCR1)
-    TIM3->CCMR2 = 0x6060;      //CH3, CH4 output PWM mode 1 (channel active TIM3->CNT < TIM3->CCR1)
+    //linked to TIM1 funcionan en serie TIM1->TIM3
+    //external clock mode 1, cuento en cada update de TIM1
+    TIM3->SMCR |= TIM_SMCR_SMS_2 | TIM_SMCR_SMS_1 | TIM_SMCR_SMS_0;
+    // TIM3->CCMR1 = 0x0000;
+    // TIM3->CCMR2 = 0x0000;
+    // TIM3->CCER |= 0;
 
-    TIM3->CCER |= TIM_CCER_CC4E | TIM_CCER_CC4P | TIM_CCER_CC3E | TIM_CCER_CC3P | TIM_CCER_CC2E | TIM_CCER_CC2P | TIM_CCER_CC1E | TIM_CCER_CC1P;	//CH4 CH3 CH2 y CH1 enable on pin & polarity reversal
-
-
-    TIM3->ARR = DUTY_100_PERCENT;        //tick cada 20.83us --> 48KHz
+    TIM3->ARR = 60;        //TIM1 -> 24KHz, tick cada 41.66us --> 400Hz
     TIM3->CNT = 0;
     TIM3->PSC = 0;	      
+
+    //linked to TIM1  funcionan en paralelo linkeados
+    // TIM3->SMCR |= TIM_SMCR_SMS_2;			//trigger: reset mode; link timer 1
+    // // TIM3->SMCR |= TIM_SMCR_SMS_2 | TIM_SMCR_SMS_1;	//trigger: trigger mode; link timer 1
+    // TIM3->CCMR1 = 0x6060;      //CH1, CH2 output PWM mode 1 (channel active TIM3->CNT < TIM3->CCR1)
+    // TIM3->CCMR2 = 0x6060;      //CH3, CH4 output PWM mode 1 (channel active TIM3->CNT < TIM3->CCR1)
+
+    // TIM3->CCER |= TIM_CCER_CC4E | TIM_CCER_CC4P | TIM_CCER_CC3E | TIM_CCER_CC3P | TIM_CCER_CC2E | TIM_CCER_CC2P | TIM_CCER_CC1E | TIM_CCER_CC1P;	//CH4 CH3 CH2 y CH1 enable on pin & polarity reversal
+
+
+    // TIM3->ARR = DUTY_100_PERCENT;        //tick cada 20.83us --> 48KHz
+    // TIM3->CNT = 0;
+    // TIM3->PSC = 0;	      
 
     //Configuracion Pines
     //Alternate Fuction
@@ -158,10 +170,10 @@ void TIM_3_Init (void)
     // temp |= 0x11000000;			//PA7 -> AF1; PA6 -> AF1
     // GPIOA->AFR[0] = temp;
 
-    temp = GPIOB->AFR[0];
-    temp &= 0xFF00FF00;                 //PB5 -> AF1; PB4 -> AF1
-    temp |= 0x00110011;			//PB1 -> AF1; PB0 -> AF1
-    GPIOB->AFR[0] = temp;
+    // temp = GPIOB->AFR[0];
+    // temp &= 0xFF00FF00;                 //PB5 -> AF1; PB4 -> AF1
+    // temp |= 0x00110011;			//PB1 -> AF1; PB0 -> AF1
+    // GPIOB->AFR[0] = temp;
 
     // Enable timer ver UDIS
     //TIM3->DIER |= TIM_DIER_UIE;
