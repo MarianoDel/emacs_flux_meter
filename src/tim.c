@@ -130,7 +130,7 @@ void TIM_1_Init (void)
 
 void TIM_3_Init (void)
 {
-    unsigned long temp;
+    // unsigned long temp;
 
     if (!RCC_TIM3_CLK)
         RCC_TIM3_CLK_ON;
@@ -146,7 +146,8 @@ void TIM_3_Init (void)
     // TIM3->CCMR2 = 0x0000;
     // TIM3->CCER |= 0;
 
-    TIM3->ARR = 60;        //TIM1 -> 24KHz, tick cada 41.66us --> 400Hz
+    // TIM3->ARR = 60;        //TIM1 -> 24KHz, tick cada 41.66us --> 400Hz empieza a ser inestable en 40Hz
+    TIM3->ARR = 12;        //TIM1 -> 24KHz, tick cada 41.66us --> 2000Hz empieza a ser inestable en 40Hz
     TIM3->CNT = 0;
     TIM3->PSC = 0;	      
 

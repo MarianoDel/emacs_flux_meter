@@ -141,11 +141,13 @@ typedef enum
     MAIN_SET_ZERO_0 = 0,
     MAIN_SET_ZERO_1,
     MAIN_SET_ZERO_2,
+    MAIN_GOTO_TAKE_SAMPLES,
     MAIN_TAKE_SAMPLES,
-    MAIN_CALCULATE_FREQUENCY,
     MAIN_SHOW_SCREENS,
     MAIN_SHOW_MODULE_B,
-    MAIN_SHOW_COMPONENTS_XYZ
+    MAIN_SHOW_COMPONENTS_XYZ,
+    MAIN_SHOW_FREQUENCY,
+    MAIN_SHOW_LINES
 
     
 } main_state_t;
@@ -163,9 +165,14 @@ typedef enum {
 
 } resp_t;
 
-//pantallas de medicion
-#define SCREEN_MODULE_B        0
-#define SCREEN_COMPONENTS_XYZ  1
+typedef enum {
+    FREQ_LOOK_FOR_RISING = 0,
+    FREQ_WAIT_LOW,
+    FREQ_END_RISING,
+    FREQ_ENDED
+
+} freq_t;
+
 
 /* Module Functions ------------------------------------------------------------*/
 sw_state_t CheckS1 (void);

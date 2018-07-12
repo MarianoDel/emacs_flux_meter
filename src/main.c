@@ -57,21 +57,39 @@ unsigned short min_y = 0;
 unsigned short max_z = 0;
 unsigned short min_z = 0;
 
-unsigned short zero_for_x = 0;
-unsigned short zero_for_y = 0;
-unsigned short zero_for_z = 0;
+volatile short x = 0;
+volatile short y = 0;
+volatile short z = 0;
+
+volatile unsigned short zero_for_x = 0;
+volatile unsigned short zero_for_y = 0;
+volatile unsigned short zero_for_z = 0;
+
+volatile unsigned int B_module = 0;
+volatile unsigned char B_is_updated = 0;
 
 unsigned short x_zero [32];
 unsigned short y_zero [32];
 unsigned short z_zero [32];
 
-#define VECTOR_LENGTH 100
+unsigned short last_max_b = 0;
+#define VECTOR_LENGTH 8
 unsigned short v_B [VECTOR_LENGTH];
+
+#define SAMPLES_INDEX_LENGTH    2000
+unsigned short samples_index = 0;
+
+#define B_THRESHOLD_FOR_FREQ_UP    25
+#define B_THRESHOLD_FOR_FREQ_DWN   20
 
 //--- FUNCIONES DEL MODULO ---//
 extern void EXTI4_15_IRQHandler(void);
 void TimingDelay_Decrement(void);
 void DMAConfig(void);
+void DMAEnableInterrupt (void);
+void DMADisableInterrupt (void);
+extern void DMA1_Channel1_IRQHandler (void);
+
 
 
 // ------- para el DMA -------
@@ -84,9 +102,6 @@ void DMAConfig(void);
 
 
 
-#define PID_UNDERSAMPLING    5    //muestreo a 24KHz / pid_samples
-
-
 const char s_blank_line [] = {"                "};
 //-------------------------------------------//
 // @brief  Main program.
@@ -96,20 +111,21 @@ const char s_blank_line [] = {"                "};
 int main(void)
 {
     unsigned char i = 0;
-    unsigned short ii = 0;    
     char s_lcd1 [20];
     char s_lcd2 [20];
     main_state_t main_state = MAIN_SET_ZERO_0;
     resp_t resp = resp_continue;
-    unsigned char undersampling = 0;
-    unsigned char zero_index = 0;
-    unsigned char index_vector = 0;
-    short x = 0, y = 0, z = 0;
-    unsigned int B_module = 0;
-    unsigned short max_b = 0;
-    unsigned char vector_ended = 0;
+    freq_t freq_state = FREQ_LOOK_FOR_RISING;
 
-    unsigned char screen = SCREEN_MODULE_B;
+    unsigned char zero_index = 0;
+    unsigned short max_b = 0;
+
+    unsigned char screen = MAIN_SHOW_MODULE_B;
+    unsigned char screen_changed = 0;
+
+    unsigned short start_freq_sample = 0;
+    unsigned short end_freq_sample = 0;
+    
     
     //GPIO Configuration.
     GPIO_Config();
@@ -234,7 +250,6 @@ int main(void)
         switch (main_state)
         {
         case MAIN_SET_ZERO_0:
-            undersampling = 0;
             zero_index = 0;
             main_state = MAIN_SET_ZERO_1;
             break;
@@ -245,26 +260,17 @@ int main(void)
                 // Clear DMA TC flag
                 sequence_ready_reset;
 
-                //tomo 32 muestras para setear el zero
-                // if (undersampling < (PID_UNDERSAMPLING - 1))
-                // {
-                //     undersampling++;
-                // }
-                // else
-                // {
-                //     undersampling = 0;
-                    if (zero_index < 32)
-                    {
-                        x_zero[zero_index] = X_Channel;
-                        y_zero[zero_index] = Y_Channel;
-                        z_zero[zero_index] = Z_Channel;
-                        zero_index++;
-                    }
-                // }
+                if (zero_index < 32)
+                {
+                    x_zero[zero_index] = X_Channel;
+                    y_zero[zero_index] = Y_Channel;
+                    z_zero[zero_index] = Z_Channel;
+                    zero_index++;
+                }
             }
 
             resp = FuncShowBlink ((const char *) " Setting Zero   ",
-                                  (const char *) " Flux           ", 3, BLINK_DIRECT);
+                                  (const char *) " Flux           ", 2, BLINK_DIRECT);
 
             if ((resp == resp_finish) && (zero_index == 32))
             {
@@ -281,50 +287,116 @@ int main(void)
             resp = FuncShowBlink (s_lcd1, s_lcd2, 1, BLINK_NO);
 
             if (resp == resp_finish)
-                main_state = MAIN_TAKE_SAMPLES;
-            
+            {
+                DMAEnableInterrupt();
+                main_state = MAIN_GOTO_TAKE_SAMPLES;
+            }            
+            break;
+
+        case MAIN_GOTO_TAKE_SAMPLES:
+            max_x = 0;
+            min_x = 0;
+            max_y = 0;
+            min_y = 0;
+            max_z = 0;
+            min_z = 0;
+
+            max_b = 0;
+            samples_index = 0;
+            main_state++;
             break;
 
         case MAIN_TAKE_SAMPLES:
-            if (vector_ended)
+            if (B_is_updated)
             {
-                vector_ended = 0;
-                main_state++;
-            }
-            break;
+                B_is_updated = 0;
+                
+                if (samples_index < SAMPLES_INDEX_LENGTH)
+                {
+                    if (max_x < x)
+                        max_x = x;
+                    else if (min_x > x)
+                        min_x = x;
 
-        case MAIN_CALCULATE_FREQUENCY:
-            //busco dos puntos iguales en el vector con un threshold
-            max_b = 0;
-            for (ii = 0; ii < VECTOR_LENGTH; ii++)
-            {
-                if (max_b < v_B[index_vector])
-                    max_b = v_B[index_vector];
-            }
+                    if (max_y < y)
+                        max_y = y;
+                    else if (min_y > y)
+                        min_y = y;
 
-            
-            sprintf(s_lcd2, "|B|= %d       ", max_b);
-            main_state++;
-            
+                    if (max_z < z)
+                        max_z = z;
+                    else if (min_z > z)
+                        min_z = z;                                        
+
+                    if (max_b < B_module)
+                        max_b = B_module;
+
+                    switch (freq_state)
+                    {
+                    case FREQ_LOOK_FOR_RISING:
+                        if (B_module > B_THRESHOLD_FOR_FREQ_UP)
+                        {
+                            start_freq_sample = samples_index;
+                            freq_state++;                            
+                        }
+                        break;
+
+                    case FREQ_WAIT_LOW:
+                        if (B_module < B_THRESHOLD_FOR_FREQ_DWN)
+                            freq_state++;                            
+
+                        break;
+
+                    case FREQ_END_RISING:
+                        if (B_module > B_THRESHOLD_FOR_FREQ_UP)
+                        {
+                            end_freq_sample = samples_index;
+                            freq_state++;                            
+                        }                        
+                        break;
+
+                    case FREQ_ENDED:
+                        break;
+                    }
+
+                    samples_index++;
+                }
+                else
+                    main_state++;
+
+            }
             break;
 
         case MAIN_SHOW_SCREENS:
-            // if (screen == SCREEN_MODULE_B)
-            //     main_state = MAIN_SHOW_MODULE_B;
+            main_state = screen;            
 
-            // if (screen == SCREEN_COMPONENTS_XYZ)
-            //     main_state = MAIN_SHOW_COMPONENTS_XYZ;            
-
-            resp = FuncShowBlink (s_blank_line, s_lcd2, 0, BLINK_NO);
-
-            if (resp == resp_finish)
-                main_state = MAIN_TAKE_SAMPLES;
             break;
 
         case MAIN_SHOW_MODULE_B:
+            v_B[0] = max_b;
+            sprintf(s_lcd1, "|Bmean|= %d       ", MAFilter8(v_B));
+            sprintf(s_lcd2, "|Bpeak|= %d       ", max_b);
+            main_state = MAIN_SHOW_LINES;
             break;
 
         case MAIN_SHOW_COMPONENTS_XYZ:
+            sprintf(s_lcd1, "x: %d y: %d   ", max_x, max_y);
+            sprintf(s_lcd2, "z: %d         ", max_z);
+            main_state = MAIN_SHOW_LINES;
+            break;
+
+        case MAIN_SHOW_FREQUENCY:
+            sprintf(s_lcd1, "freq: %d      ", max_x);
+            sprintf(s_lcd2, "z: %d         ", max_z);
+            main_state = MAIN_SHOW_LINES;
+            break;
+            
+        case MAIN_SHOW_LINES:
+            resp = FuncShowBlink (s_lcd1, s_lcd2, 0, BLINK_NO);
+
+            if (resp == resp_finish)
+                main_state = MAIN_GOTO_TAKE_SAMPLES;
+            
             break;
 
         default:
@@ -332,78 +404,28 @@ int main(void)
             break;
         }
 
-        //siempre tengo muestras y vector cargandose
-        //excepto cuando busco el zero
-        if (main_state > MAIN_SET_ZERO_2)
+        //cosas que no tienen que ver cn las muestras
+        if (CheckS2() > S_NO)
         {
-            if (sequence_ready)
+            if (!screen_changed)
             {
-                // Clear DMA TC flag
-                sequence_ready_reset;
-
-                // if (undersampling < (PID_UNDERSAMPLING - 1))
-                //     undersampling++;
-                // else
-                //     undersampling = 0;
-                //                 if (!undersampling)
-                // {
-                x = X_Channel - zero_for_x;
-                y = Y_Channel - zero_for_y;
-                z = Z_Channel - zero_for_z;
-
-                B_module = x * x;
-                B_module += y * y;
-                B_module += z * z;
-
-                B_module = sqrt(B_module);
-
-                Update_TIM1_CH2 ((unsigned short) B_module);
-
-                if (max_x < x)
-                    max_x = x;
-                else if (min_x > x)
-                    min_x = x;
-
-                if (max_y < y)
-                    max_y = y;
-                else if (min_y > y)
-                    min_y = y;
-
-                if (max_z < z)
-                    max_z = z;
-                else if (min_z > z)
-                    min_z = z;                                        
-
-                //TODO: esto por tiempo agrega un poco de error de amplitud
-                if (index_vector < (VECTOR_LENGTH - 1))
-                {
-                    v_B [index_vector] = (unsigned short) B_module;
-                    index_vector++;
-                }
+                screen_changed = 1;
+                if (screen < MAIN_SHOW_FREQUENCY)
+                    screen++;
                 else
-                {
-                    index_vector = 0;
-                    max_x = 0;
-                    max_y = 0;
-                    max_z = 0;
-                    min_x = 0;
-                    min_y = 0;
-                    min_z = 0;                
-                    // vector_ended = 1;
-                }            
-                // }
-
-
-                //me fijo si hubo overrun en ADC
-                if (ADC1->ISR & ADC_IT_OVR)
-                {
-                    ADC1->ISR |= ADC_IT_EOC | ADC_IT_EOSEQ | ADC_IT_OVR;
-                }
+                    screen = MAIN_SHOW_MODULE_B;
             }
         }
+        else
+            screen_changed = 0;
+        
+            
+                
 
+                
 
-        //cosas que no tienen que ver cn las muestras
+            
+        
         UpdateSwitches();
         
     }    //fin while 1
@@ -411,6 +433,28 @@ int main(void)
     return 0;
 }
 //--- End of Main ---//
+
+void DMA1_Channel1_IRQHandler (void)
+{
+    if (sequence_ready)
+    {
+        // Clear DMA TC flag
+        sequence_ready_reset;
+        
+        x = X_Channel - zero_for_x;
+        y = Y_Channel - zero_for_y;
+        z = Z_Channel - zero_for_z;
+
+        B_module = x * x;
+        B_module += y * y;
+        B_module += z * z;
+
+        B_module = sqrt(B_module);
+
+        Update_TIM1_CH2 ((unsigned short) (B_module >> 2));
+        B_is_updated = 1;
+    }
+}
 
 void DMAConfig(void)
 {
@@ -440,6 +484,18 @@ void DMAConfig(void)
 
     //Enable
     //DMA1_Channel1->CCR |= DMA_CCR_EN;
+    NVIC_EnableIRQ(DMA1_Channel1_IRQn);
+    NVIC_SetPriority(DMA1_Channel1_IRQn, 3);
+}
+
+void DMAEnableInterrupt (void)
+{
+    DMA1_Channel1->CCR |= DMA_CCR_TCIE;
+}
+
+void DMADisableInterrupt (void)
+{
+    DMA1_Channel1->CCR &= ~DMA_CCR_TCIE;
 }
 
 void TimingDelay_Decrement(void)
