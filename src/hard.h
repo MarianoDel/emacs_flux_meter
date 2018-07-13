@@ -33,7 +33,7 @@
 #define WITH_BIDIRECTIONAL
 
 //------ Configuration for Firmware-Channels -----
-
+#define WITH_ADJUST_B
 
 //---- End of Features Configuration ----------
 

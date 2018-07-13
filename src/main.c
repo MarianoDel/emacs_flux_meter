@@ -79,8 +79,11 @@ unsigned short v_B [VECTOR_LENGTH];
 #define SAMPLES_INDEX_LENGTH    2000
 unsigned short samples_index = 0;
 
-#define B_THRESHOLD_FOR_FREQ_UP    180    //equivale a 30 Gauss
-#define B_THRESHOLD_FOR_FREQ_DWN   150    //equivale a 20 Gauss
+#define B_THRESHOLD_FOR_FREQ_UP    81    //equivale a 20 Gauss + ruido
+#define B_THRESHOLD_FOR_FREQ_DWN   51    //equivale a 10 Gauss + ruido
+
+#define RECTA_B    20
+#define RECTA_M    0.33
 
 //--- FUNCIONES DEL MODULO ---//
 extern void EXTI4_15_IRQHandler(void);
@@ -90,7 +93,7 @@ void DMAEnableInterrupt (void);
 void DMADisableInterrupt (void);
 extern void DMA1_Channel1_IRQHandler (void);
 short moduleShort (short);
-unsigned short moduleAdjustB (short);
+short AjusteB (short b);
 
 
 // ------- para el DMA -------
@@ -281,8 +284,8 @@ int main(void)
                 zero_for_x = MAFilter32Fast(x_zero);
                 zero_for_y = MAFilter32Fast(y_zero);
                 zero_for_z = MAFilter32Fast(z_zero);
-                sprintf(s_lcd1, "x0: %d y0: %d ", zero_for_x, zero_for_y);
-                sprintf(s_lcd2, "z0: %d        ", zero_for_z);
+                sprintf(s_lcd1, "x0:%4d y0:%4d  ", zero_for_x, zero_for_y);
+                sprintf(s_lcd2, "z0:%4d         ", zero_for_z);
             }
             break;
 
@@ -429,10 +432,14 @@ int main(void)
                         strcpy(s_lcd3, "z");
                 }
             }                
-                                    
-            // v_B[0] = max_b;
-            v_B[0] = moduleAdjustB(max_b);
-            sprintf(s_lcd1, "|Bpeak|=%4d  %s ", moduleAdjustB(max_b), s_lcd3);
+
+#ifdef WITH_ADJUST_B            
+            v_B[0] = (unsigned short) moduleShort(AjusteB(max_b));
+            sprintf(s_lcd1, "|Bpeak|=%4d  %s ", moduleShort(AjusteB(max_b)), s_lcd3);
+#else
+            v_B[0] = max_b;
+            sprintf(s_lcd1, "|Bpeak|=%4d  %s ",max_b, s_lcd3);            
+#endif
             sprintf(s_lcd2, "|Bmean|=%4d    ", MAFilter8(v_B));            
             main_state = MAIN_SHOW_LINES;
             break;
@@ -447,9 +454,13 @@ int main(void)
             
             if (max_z < moduleShort(min_z))
                 max_z = min_z;
-            
-            sprintf(s_lcd1, "x: %d y: %d   ", moduleAdjustB(max_x), moduleAdjustB(max_y));
-            sprintf(s_lcd2, "z: %d         ", moduleAdjustB(max_z));
+#ifdef WITH_ADJUST_B            
+            sprintf(s_lcd1, "x: %d y: %d   ", AjusteB(max_x), AjusteB(max_y));
+            sprintf(s_lcd2, "z: %d         ", AjusteB(max_z));
+#else
+            sprintf(s_lcd1, "x: %d y: %d   ", max_x, max_y);
+            sprintf(s_lcd2, "z: %d         ", max_z);            
+#endif
             main_state = MAIN_SHOW_LINES;
             break;
 
@@ -534,13 +545,21 @@ short moduleShort (short a)
         return a;
 }
 
-unsigned short moduleAdjustB (short b)
+short AjusteB (short b)
 {
-    b -= 56;
-    if (b < 0)
-        return 0;
+    if (b > RECTA_B)
+    {
+        b -= RECTA_B;
+        b = b * RECTA_M;
+    }
+    else if (b < -RECTA_B)
+    {
+        b += RECTA_B;
+        b = b * RECTA_M;
+    }
+    else
+        b = 0;
 
-    b = b * 0.33;
     return b;    
 }
 
