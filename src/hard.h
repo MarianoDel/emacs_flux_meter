@@ -147,7 +147,8 @@ typedef enum
     MAIN_SHOW_MODULE_B,
     MAIN_SHOW_COMPONENTS_XYZ,
     MAIN_SHOW_FREQUENCY,
-    MAIN_SHOW_LINES
+    MAIN_SHOW_LINES,
+    MAIN_SHOW_LINES_1
 
     
 } main_state_t;

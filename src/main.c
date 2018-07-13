@@ -50,12 +50,12 @@ volatile unsigned char switches_timer = 0;
 volatile unsigned short timer_standby;
 volatile unsigned short wait_ms_var = 0;
 
-unsigned short max_x = 0;
-unsigned short min_x = 0;
-unsigned short max_y = 0;
-unsigned short min_y = 0;
-unsigned short max_z = 0;
-unsigned short min_z = 0;
+short max_x = 0;
+short min_x = 0;
+short max_y = 0;
+short min_y = 0;
+short max_z = 0;
+short min_z = 0;
 
 volatile short x = 0;
 volatile short y = 0;
@@ -79,8 +79,8 @@ unsigned short v_B [VECTOR_LENGTH];
 #define SAMPLES_INDEX_LENGTH    2000
 unsigned short samples_index = 0;
 
-#define B_THRESHOLD_FOR_FREQ_UP    25
-#define B_THRESHOLD_FOR_FREQ_DWN   20
+#define B_THRESHOLD_FOR_FREQ_UP    180    //equivale a 30 Gauss
+#define B_THRESHOLD_FOR_FREQ_DWN   150    //equivale a 20 Gauss
 
 //--- FUNCIONES DEL MODULO ---//
 extern void EXTI4_15_IRQHandler(void);
@@ -90,6 +90,7 @@ void DMAEnableInterrupt (void);
 void DMADisableInterrupt (void);
 extern void DMA1_Channel1_IRQHandler (void);
 short moduleShort (short);
+unsigned short moduleAdjustB (short);
 
 
 // ------- para el DMA -------
@@ -429,8 +430,9 @@ int main(void)
                 }
             }                
                                     
-            v_B[0] = max_b;
-            sprintf(s_lcd1, "|Bpeak|=%4d  %s ", max_b, s_lcd3);
+            // v_B[0] = max_b;
+            v_B[0] = moduleAdjustB(max_b);
+            sprintf(s_lcd1, "|Bpeak|=%4d  %s ", moduleAdjustB(max_b), s_lcd3);
             sprintf(s_lcd2, "|Bmean|=%4d    ", MAFilter8(v_B));            
             main_state = MAIN_SHOW_LINES;
             break;
@@ -446,8 +448,8 @@ int main(void)
             if (max_z < moduleShort(min_z))
                 max_z = min_z;
             
-            sprintf(s_lcd1, "x: %d y: %d   ", max_x, max_y);
-            sprintf(s_lcd2, "z: %d         ", max_z);
+            sprintf(s_lcd1, "x: %d y: %d   ", moduleAdjustB(max_x), moduleAdjustB(max_y));
+            sprintf(s_lcd2, "z: %d         ", moduleAdjustB(max_z));
             main_state = MAIN_SHOW_LINES;
             break;
 
@@ -455,7 +457,7 @@ int main(void)
             if (end_freq_sample > start_freq_sample)
             {
                 unsigned short f = end_freq_sample - start_freq_sample;
-                f = 1000 / f;
+                f = 2000 / f;
                 sprintf(s_lcd1, "freq: %d      ", f);
                 strcpy(s_lcd2, s_blank_line);
             }
@@ -469,13 +471,21 @@ int main(void)
             break;
             
         case MAIN_SHOW_LINES:
+            resp = FuncShowBlink (s_blank_line, s_blank_line, 0, BLINK_NO);
+
+            if (resp == resp_finish)
+                main_state = MAIN_SHOW_LINES_1;
+            
+            break;
+
+        case MAIN_SHOW_LINES_1:
             resp = FuncShowBlink (s_lcd1, s_lcd2, 0, BLINK_NO);
 
             if (resp == resp_finish)
                 main_state = MAIN_GOTO_TAKE_SAMPLES;
             
             break;
-
+            
         default:
             main_state = MAIN_SET_ZERO_0;
             break;
@@ -522,6 +532,16 @@ short moduleShort (short a)
         return -a;
     else
         return a;
+}
+
+unsigned short moduleAdjustB (short b)
+{
+    b -= 56;
+    if (b < 0)
+        return 0;
+
+    b = b * 0.33;
+    return b;    
 }
 
 void DMA1_Channel1_IRQHandler (void)
