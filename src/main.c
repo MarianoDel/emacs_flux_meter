@@ -79,8 +79,11 @@ unsigned short v_B [VECTOR_LENGTH];
 #define SAMPLES_INDEX_LENGTH    2000
 unsigned short samples_index = 0;
 
+//------ para determinacion de frequency -----------
 #define B_THRESHOLD_FOR_FREQ_UP    81    //equivale a 20 Gauss + ruido
 #define B_THRESHOLD_FOR_FREQ_DWN   51    //equivale a 10 Gauss + ruido
+unsigned short v_freq_crosess [16];
+unsigned char freq_cross = 0;
 
 #define RECTA_B    20
 #define RECTA_M    0.33
@@ -94,6 +97,8 @@ void DMADisableInterrupt (void);
 extern void DMA1_Channel1_IRQHandler (void);
 short moduleShort (short);
 short AjusteB (short b);
+unsigned short GetFreqFromVector(unsigned short *, unsigned char);
+unsigned short GetFreqFromIndex (unsigned short);    
 
 
 // ------- para el DMA -------
@@ -129,8 +134,8 @@ int main(void)
     unsigned char screen_changed = 0;
     unsigned char setting_zero = 0;
 
-    unsigned short start_freq_sample = 0;
-    unsigned short end_freq_sample = 0;
+    // unsigned short start_freq_sample = 0;
+    // unsigned short end_freq_sample = 0;
 
     
     //GPIO Configuration.
@@ -310,8 +315,9 @@ int main(void)
             max_b = 0;
             samples_index = 0;
             freq_state = FREQ_LOOK_FOR_FIRST_LOW;
-            start_freq_sample = 0;
-            end_freq_sample = 0;
+            freq_cross = 0;
+            // start_freq_sample = 0;
+            // end_freq_sample = 0;
             main_state++;
             break;
 
@@ -351,7 +357,9 @@ int main(void)
                     case FREQ_LOOK_FOR_RISING:
                         if (B_module > B_THRESHOLD_FOR_FREQ_UP)
                         {
-                            start_freq_sample = samples_index;
+                            v_freq_crosess[freq_cross] = samples_index;
+                            freq_cross++;
+                            // start_freq_sample = samples_index;
                             freq_state++;                            
                         }
                         break;
@@ -365,12 +373,17 @@ int main(void)
                     case FREQ_END_RISING:
                         if (B_module > B_THRESHOLD_FOR_FREQ_UP)
                         {
-                            end_freq_sample = samples_index;
+                            v_freq_crosess[freq_cross] = samples_index;
+                            freq_cross++;
+                            // end_freq_sample = samples_index;
                             freq_state++;                            
                         }                        
                         break;
 
                     case FREQ_ENDED:
+                        if (freq_cross < 15)
+                            freq_state = FREQ_LOOK_FOR_FIRST_LOW;
+
                         break;
                     }
 
@@ -465,13 +478,21 @@ int main(void)
             break;
 
         case MAIN_SHOW_FREQUENCY:
-            if (end_freq_sample > start_freq_sample)
+            //reconvierto el vector uso zero_index como variable
+            zero_index = GetFreqFromVector(v_freq_crosess, freq_cross);
+            if (zero_index)
             {
-                unsigned short f = end_freq_sample - start_freq_sample;
-                f = 2000 / f;
-                sprintf(s_lcd1, "freq: %d      ", f);
-                strcpy(s_lcd2, s_blank_line);
+                zero_index = GetFreqFromIndex(zero_index);
+                sprintf(s_lcd1, "freq: %d      ", zero_index);
+                strcpy(s_lcd2, s_blank_line);                
             }
+            // if (end_freq_sample > start_freq_sample)
+            // {
+            //     unsigned short f = end_freq_sample - start_freq_sample;
+            //     f = 2000 / f;
+            //     sprintf(s_lcd1, "freq: %d      ", f);
+            //     strcpy(s_lcd2, s_blank_line);
+            // }
             else
             {
                 strcpy(s_lcd1, "No frequency    ");
@@ -583,6 +604,60 @@ void DMA1_Channel1_IRQHandler (void)
         Update_TIM1_CH2 ((unsigned short) (B_module >> 2));
         B_is_updated = 1;
     }
+}
+
+unsigned short GetFreqFromVector(unsigned short * v, unsigned char cross)
+{
+    unsigned char i;
+    unsigned int total_sum = 0;
+    unsigned char divisor = 3;
+    
+    //el vector tiene 16 posiciones, las primeras dos definen si hay medicion
+    if (cross < 2)
+        return 0;
+    
+    // if (*(v + 1) <= *v)
+    //     return 0;
+
+    //resuelvo solo para 8, 4, 2 o 1; cross 16, 8, 4, 2
+    if (cross < 16)
+    {
+        if (cross >= 8)
+        {
+            cross = 8;
+            divisor = 2;
+        }
+
+        if (cross >= 4)
+        {
+            cross = 4;
+            divisor = 1;
+        }
+
+        if (cross >= 2)
+        {
+            cross = 2;
+            divisor = 0;
+        }
+    }
+    
+    for (i = 0; i < cross; i+= 2)
+    {
+        total_sum += *(v + i + 1) - *(v + i);
+    }
+
+    return (unsigned short) (total_sum >> divisor);
+}
+
+unsigned short GetFreqFromIndex (unsigned short x)
+{
+    unsigned short new_x;
+    //ajusto un poquito el indice
+    new_x = x * 98;
+    new_x = new_x / 100;
+    new_x += 4;
+    
+    return (2000 / new_x);
 }
 
 void DMAConfig(void)
