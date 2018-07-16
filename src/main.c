@@ -133,10 +133,6 @@ int main(void)
     unsigned char screen = MAIN_SHOW_MODULE_B;
     unsigned char screen_changed = 0;
     unsigned char setting_zero = 0;
-
-    // unsigned short start_freq_sample = 0;
-    // unsigned short end_freq_sample = 0;
-
     
     //GPIO Configuration.
     GPIO_Config();
@@ -316,8 +312,6 @@ int main(void)
             samples_index = 0;
             freq_state = FREQ_LOOK_FOR_FIRST_LOW;
             freq_cross = 0;
-            // start_freq_sample = 0;
-            // end_freq_sample = 0;
             main_state++;
             break;
 
@@ -359,7 +353,6 @@ int main(void)
                         {
                             v_freq_crosess[freq_cross] = samples_index;
                             freq_cross++;
-                            // start_freq_sample = samples_index;
                             freq_state++;                            
                         }
                         break;
@@ -375,7 +368,6 @@ int main(void)
                         {
                             v_freq_crosess[freq_cross] = samples_index;
                             freq_cross++;
-                            // end_freq_sample = samples_index;
                             freq_state++;                            
                         }                        
                         break;
@@ -486,13 +478,6 @@ int main(void)
                 sprintf(s_lcd1, "freq: %d      ", zero_index);
                 strcpy(s_lcd2, s_blank_line);                
             }
-            // if (end_freq_sample > start_freq_sample)
-            // {
-            //     unsigned short f = end_freq_sample - start_freq_sample;
-            //     f = 2000 / f;
-            //     sprintf(s_lcd1, "freq: %d      ", f);
-            //     strcpy(s_lcd2, s_blank_line);
-            // }
             else
             {
                 strcpy(s_lcd1, "No frequency    ");
@@ -616,9 +601,6 @@ unsigned short GetFreqFromVector(unsigned short * v, unsigned char cross)
     if (cross < 2)
         return 0;
     
-    // if (*(v + 1) <= *v)
-    //     return 0;
-
     //resuelvo solo para 8, 4, 2 o 1; cross 16, 8, 4, 2
     if (cross < 16)
     {
